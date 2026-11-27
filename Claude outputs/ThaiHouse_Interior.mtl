@@ -1,0 +1,14 @@
+newmtl M_Floor_Planks
+Kd 1 1 1
+Ks 0 0 0
+map_Kd floor_planks.png
+
+newmtl M_Wall_Planks
+Kd 1 1 1
+Ks 0 0 0
+map_Kd wall_planks.png
+
+newmtl M_Dark_Wood
+Kd 1 1 1
+Ks 0 0 0
+map_Kd dark_wood.png

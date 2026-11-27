@@ -1,0 +1,17 @@
+newmtl BackSupports
+Kd 1 1 1
+
+newmtl SideSupports
+Kd 1 1 1
+
+newmtl BackRest_Slates
+Kd 1 1 1
+
+newmtl Slates
+Kd 1 1 1
+
+newmtl Arm_Rests
+Kd 1 1 1
+
+newmtl Lower_Supports
+Kd 1 1 1
