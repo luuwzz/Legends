@@ -41,7 +41,7 @@ namespace DarkAwakening.EditorTools
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) EditorSceneManager.OpenScene(ScenePath);
         }
 
-        const int BuildVersion = 25;                       // bump to make the scene rebuild itself once after an update
+        const int BuildVersion = 28;                       // bump to make the scene rebuild itself once after an update
         static string DoneKey { get { return "DA_autobuild_done_" + BuildVersion; } }
 
         [InitializeOnLoadMethod]
@@ -176,6 +176,10 @@ namespace DarkAwakening.EditorTools
             Transform aDoor = Anchor("A_Door", systems.transform, new Vector3(1.35f, 0f, -0.55f), 90f);
             Transform aConfront = Anchor("A_Confront", systems.transform, new Vector3(-0.6f, 0f, 1.78f), 0f);
             Transform aHide = Anchor("A_Hide", systems.transform, new Vector3(-1.55f, 0f, -1.75f), 0f);
+            Transform aAltar = Anchor("A_Altar", systems.transform, new Vector3(-4.15f, 0f, 0.95f), 0f);
+            Transform aKitchenBranch = Anchor("A_KitchenBranch", systems.transform, new Vector3(1.55f, 0f, -3.45f), 90f);
+            Transform aHideWest = Anchor("A_HideWest", systems.transform, new Vector3(-4.35f, 0f, -1.55f), 0f);
+            Transform aHideKit = Anchor("A_HideKitchen", systems.transform, new Vector3(-1.85f, 0f, -4.25f), 0f);
 
             // ---- build the world
             BuildHouse(houseRoot.transform, wallMat, floorMat, darkWood, tableWood, metalMat, clothMat);
@@ -196,22 +200,24 @@ namespace DarkAwakening.EditorTools
             Transform props = houseRoot.transform;
             DAInteractable windowMark = MakeInteractable("Interact_Window", props, new Vector3(-0.6f, 1.45f, 2.0f), new Vector3(1.3f, 1.2f, 0.25f), "Window", glowMat, 0.28f, new Vector3(0f, 0f, -0.2f), true);
             DAInteractable shutterPick = MakeInteractable("Interact_Shutters", props, new Vector3(-0.6f, 1.45f, 2.0f), new Vector3(1.3f, 1.2f, 0.25f), "Close the shutters", glowMat, 0.28f, new Vector3(0f, 0f, -0.2f), true);
-            DAInteractable lighterPick = MakeInteractable("Interact_Lighter", props, new Vector3(1.38f, 0.82f, 1.38f), new Vector3(0.3f, 0.25f, 0.3f), "Candle", glowMat, 0.14f, new Vector3(0f, 0.12f, 0f), true);
-            DAInteractable branchPick = MakeInteractable("Interact_ThornBranch", props, new Vector3(2.38f, 1.35f, -1.55f), new Vector3(0.5f, 0.8f, 0.9f), "Jujube thorn branch", glowMat, 0.2f, new Vector3(-0.15f, 0.1f, 0f), true);
+            DAInteractable lighterPick = MakeInteractable("Interact_Lighter", props, new Vector3(-4.15f, 0.98f, 1.85f), new Vector3(0.3f, 0.25f, 0.3f), "Candle", glowMat, 0.14f, new Vector3(0f, 0.12f, 0f), true);
+            DAInteractable branchPick = MakeInteractable("Interact_ThornBranch", props, new Vector3(2.38f, 1.35f, -3.55f), new Vector3(0.5f, 0.8f, 0.9f), "Jujube thorn branch", glowMat, 0.2f, new Vector3(-0.15f, 0.1f, 0f), true);
             DAInteractable hidePick = MakeInteractable("Interact_HideSpot", props, new Vector3(-1.55f, 0.55f, -1.75f), new Vector3(0.7f, 0.9f, 0.6f), "Hide here", glowMat, 0.22f, new Vector3(0f, 0.2f, 0f), true);
+            DAInteractable hideWestPick = MakeInteractable("Interact_HideWest", props, new Vector3(-4.35f, 0.55f, -1.6f), new Vector3(0.6f, 0.9f, 0.6f), "Hide here", glowMat, 0.22f, new Vector3(0f, 0.2f, 0f), true);
+            DAInteractable hideKitPick = MakeInteractable("Interact_HideKitchen", props, new Vector3(-1.85f, 0.55f, -4.25f), new Vector3(0.6f, 0.9f, 0.6f), "Hide here", glowMat, 0.22f, new Vector3(0f, 0.2f, 0f), true);
 
             // second candle on the table (the one the player picks up)
-            GameObject lighterVis = MakeErawanCandle("Candle_Pickup", props, new Vector3(1.38f, 0.765f, 1.38f), 0.22f, erawanMat);
+            GameObject lighterVis = MakeErawanCandle("Candle_Pickup", props, new Vector3(-4.15f, 0.9f, 1.85f), 0.22f, erawanMat);
             lighterVis.transform.rotation = Quaternion.Euler(0f, 25f, 0f);
             if (lighterVis == null) lighterVis = new GameObject("Candle_Pickup");
             Light pcl = new GameObject("PickupCandleGlow").AddComponent<Light>();
             pcl.transform.SetParent(lighterVis.transform, true);
-            pcl.transform.position = new Vector3(1.38f, 1.0f, 1.38f);
+            pcl.transform.position = new Vector3(-4.15f, 1.13f, 1.8f);
             pcl.type = LightType.Point; pcl.color = new Color(1f, 0.7f, 0.4f); pcl.range = 1.6f; pcl.intensity = 0.5f; pcl.shadows = LightShadows.None;
             lighterPick.visualToHide = lighterVis;
 
             // thorn branch on the wall
-            GameObject branchWall = Place("Branch", "branch", "Branch_OnWall", props, new Vector3(2.40f, 1.0f, -1.55f), new Vector3(0f, 90f, 0f), 1f);
+            GameObject branchWall = Place("Branch", "branch", "Branch_OnWall", props, new Vector3(2.40f, 1.0f, -3.55f), new Vector3(0f, 90f, 0f), 1f);
             branchPick.visualToHide = branchWall;
 
             // ---- Krasue
@@ -259,6 +265,8 @@ namespace DarkAwakening.EditorTools
             // repel zones (vents)
             DARepelZone doorZone = MakeZone("Zone_DoorVent", props, new Vector3(2.44f, 1.6f, -0.5f), new Vector3(0.3f, 0.36f, 0.62f), new Vector3(3.05f, 1.6f, -0.5f), new Vector3(-1f, 0f, 0f), DARepelZone.Need.Fire);
             DARepelZone windowZone = MakeZone("Zone_Window", props, new Vector3(-0.6f, 1.45f, 2.22f), new Vector3(1.1f, 0.9f, 0.3f), new Vector3(-0.6f, 1.45f, 2.38f), new Vector3(0f, 0f, -1f), DARepelZone.Need.Fire);
+            DARepelZone westZone = MakeZone("Zone_WestWindow", props, new Vector3(-5.88f, 1.45f, 0f), new Vector3(0.3f, 0.9f, 1.1f), new Vector3(-6.08f, 1.45f, 0f), new Vector3(1f, 0f, 0f), DARepelZone.Need.Fire);
+            DARepelZone kitchenZone = MakeZone("Zone_KitchenWindow", props, new Vector3(0.3f, 1.45f, -5.52f), new Vector3(1.0f, 0.9f, 0.3f), new Vector3(0.3f, 1.45f, -5.7f), new Vector3(0f, 0f, 1f), DARepelZone.Need.Thorns);
             DARepelZone wallZone = MakeZone("Zone_WallVent", props, new Vector3(1.1f, 1.6f, 2.0f), new Vector3(0.62f, 0.36f, 0.3f), new Vector3(1.1f, 1.6f, 2.72f), new Vector3(0f, 0f, -1f), DARepelZone.Need.Thorns);
 
             // ---- lights
@@ -301,12 +309,28 @@ namespace DarkAwakening.EditorTools
             Light fill3 = NewLight("RoomFillTable", houseRoot.transform, LightType.Point, new Color(1f, 0.74f, 0.5f), 1.0f);
             fill3.transform.position = new Vector3(1.5f, 2.2f, 1.1f);
             fill3.range = 7f; fill3.shadows = LightShadows.None;
-            if (interiorLayer >= 0) { fill.cullingMask = 1 << interiorLayer; fill2.cullingMask = 1 << interiorLayer; fill3.cullingMask = 1 << interiorLayer; }
+            // altar room, kitchen: dim warm fill, stove embers, cold moon glow at the new windows
+            Light fillW = NewLight("RoomFillAltar", houseRoot.transform, LightType.Point, new Color(1f, 0.76f, 0.54f), 1.1f);
+            fillW.transform.position = new Vector3(-4.2f, 2.1f, 0.3f); fillW.range = 6.5f; fillW.shadows = LightShadows.None;
+            Light fillK = NewLight("RoomFillKitchen", houseRoot.transform, LightType.Point, new Color(1f, 0.72f, 0.5f), 1.0f);
+            fillK.transform.position = new Vector3(0f, 2.1f, -3.9f); fillK.range = 7.5f; fillK.shadows = LightShadows.None;
+            Light embers = NewLight("StoveEmbers", houseRoot.transform, LightType.Point, new Color(1f, 0.38f, 0.12f), 1.2f);
+            embers.transform.position = new Vector3(1.8f, 0.75f, -4.7f); embers.range = 3.2f; embers.shadows = LightShadows.None;
+            Light glowW = NewLight("MoonGlowWest", houseRoot.transform, LightType.Point, new Color(0.5f, 0.62f, 1f), 0.5f);
+            glowW.transform.position = new Vector3(-5.2f, 1.5f, 0f); glowW.range = 3.5f; glowW.shadows = LightShadows.None;
+            Light glowK = NewLight("MoonGlowKitchen", houseRoot.transform, LightType.Point, new Color(0.5f, 0.62f, 1f), 0.5f);
+            glowK.transform.position = new Vector3(0.3f, 1.5f, -4.8f); glowK.range = 3.5f; glowK.shadows = LightShadows.None;
+            if (interiorLayer >= 0)
+            {
+                fill.cullingMask = 1 << interiorLayer; fill2.cullingMask = 1 << interiorLayer; fill3.cullingMask = 1 << interiorLayer;
+                fillW.cullingMask = 1 << interiorLayer; fillK.cullingMask = 1 << interiorLayer; embers.cullingMask = 1 << interiorLayer;
+                glowW.cullingMask = 1 << interiorLayer; glowK.cullingMask = 1 << interiorLayer;
+            }
 
             // dawn leaks (interior warm light at vents / window)
-            Light[] leaks = new Light[3];
-            Vector3[] leakPos = { new Vector3(2.1f, 1.6f, -0.5f), new Vector3(1.1f, 1.6f, 1.8f), new Vector3(-0.6f, 1.5f, 1.7f) };
-            for (int i = 0; i < 3; i++)
+            Light[] leaks = new Light[5];
+            Vector3[] leakPos = { new Vector3(2.1f, 1.6f, -0.5f), new Vector3(1.1f, 1.6f, 1.8f), new Vector3(-0.6f, 1.5f, 1.7f), new Vector3(-5.3f, 1.5f, 0f), new Vector3(0.3f, 1.5f, -4.9f) };
+            for (int i = 0; i < 5; i++)
             {
                 leaks[i] = NewLight("DawnLeak" + i, houseRoot.transform, LightType.Point, new Color(1f, 0.68f, 0.4f), 0f);
                 leaks[i].transform.position = leakPos[i];
@@ -324,6 +348,24 @@ namespace DarkAwakening.EditorTools
 
             // ---- rig
             DARig rig = BuildRig(systems.transform, fadeMat, vigMat, grainMat, reticleMat, ringMat, rayMat, metalMat, flameMat, out DALightFlicker heldFlame, out GameObject heldLighter, out GameObject heldBranch);
+
+            // walkable rooms + furniture footprints for the click-to-walk teleport
+            rig.walkAreas = new Vector4[] {
+                new Vector4(-2.1f, -1.95f, 2.0f, 2.0f),
+                new Vector4(-5.3f, -1.9f, -2.9f, 1.9f),
+                new Vector4(-2.1f, -4.95f, 2.1f, -2.5f),
+                new Vector4(-3.0f, 0.88f, -2.0f, 1.72f),      // west doorway (main room <-> altar room)
+                new Vector4(0.24f, -2.6f, 1.16f, -1.9f) };    // south doorway (main room <-> kitchen)
+            rig.blocked = new Vector4[] {
+                new Vector4(-5.22f, 1.55f, -3.18f, 2.2f), new Vector4(-5.95f, -2.2f, -4.45f, -0.7f), new Vector4(-4.25f, -2.3f, -2.45f, -1.12f),
+                new Vector4(-6f, 1.2f, -5.0f, 2.2f),
+                new Vector4(0.9f, -5.6f, 2.7f, -3.8f), new Vector4(1.7f, -4.15f, 2.7f, -2.85f),
+                new Vector4(-2.73f, -3.6f, -1.6f, -2.5f), new Vector4(-2.7f, -4.25f, -1.65f, -3.2f), new Vector4(-2.7f, -5.35f, -1.6f, -4.25f),
+                new Vector4(-1.2f, -4.6f, 0.2f, -3.2f), new Vector4(-2.1f, -5.4f, -0.1f, -4.45f),
+                new Vector4(1.6f, -2.0f, 2.45f, -1.2f),       // ghost jar + shelf (SE corner of the main room)
+                new Vector4(-2.35f, -1.3f, -0.75f, 0.75f),    // bed
+                new Vector4(0.85f, 1.05f, 2.2f, 2.05f),       // table
+                new Vector4(-3.3f, -1.3f, -2.6f, -0.4f) };    // baskets (west room, east wall)
 
             // ---- UI
             DAUI ui = BuildUI(systems.transform, rig, subBg, btnA, btnB, tmpOverlay);
@@ -354,6 +396,9 @@ namespace DarkAwakening.EditorTools
             game.shutterL = houseRoot.transform.Find("ShutterL");
             game.shutterR = houseRoot.transform.Find("ShutterR");
             game.doorPivot = houseRoot.transform.Find("DoorPivot");
+            game.hideWestPick = hideWestPick; game.hideKitPick = hideKitPick;
+            game.aAltar = aAltar; game.aKitchenBranch = aKitchenBranch; game.aHideWest = aHideWest; game.aHideKit = aHideKit;
+            game.westZone = westZone; game.kitchenZone = kitchenZone;
             game.windowMark = windowMark; game.shutterPick = shutterPick; game.lighterPick = lighterPick; game.branchPick = branchPick; game.hidePick = hidePick;
             game.moon = moon; game.sun = sun; game.moonShaft = shaft; game.candleFlicker = candleFlicker; game.dawnLeaks = leaks;
             game.krasue = krasue; game.krasueFar = krasueFar; game.krasueMid = krasueMid; game.krasueWindow = krasueWindow;
@@ -385,11 +430,21 @@ namespace DarkAwakening.EditorTools
         {
             // room shell: low-poly Thai house interior asset (floor, walls with window/vent/door openings, ceiling, beams, frames)
             Place("ThaiHouse", "ThaiHouse_Interior", "HouseShell", parent, Vector3.zero, Vector3.zero, 1f);
-            float[] sx = { -2.45f, 0f, 2.45f };
-            float[] sz = { -1.95f, 0f, 1.95f };
-            for (int a = 0; a < sx.Length; a++)
-                for (int b = 0; b < sz.Length; b++)
-                    Box("Stilt", parent, new Vector3(sx[a], -0.8f, sz[b]), new Vector3(0.2f, 1.6f, 0.2f), dark, 0.6f);
+            // stilts under the three areas (main room, altar/storage room, kitchen)
+            float[][] stiltGrid = {
+                new float[] { -2.45f, 0f, 2.45f, -1.95f, 0f, 1.95f },
+                new float[] { -5.7f, -4.2f, -2.65f, -1.95f, 0f, 1.95f },
+                new float[] { -2.45f, 0f, 2.45f, -5.3f, -3.8f },
+            };
+            foreach (float[] g in stiltGrid)
+            {
+                int nx = 3, nz = g.Length - 3;
+                for (int a = 0; a < nx; a++)
+                    for (int b = 0; b < nz; b++)
+                    {
+                        Box("Stilt", parent, new Vector3(g[a], -0.8f, g[3 + b]), new Vector3(0.2f, 1.6f, 0.2f), dark, 0.6f);
+                    }
+            }
 
             // shutters (pivots at the hinge, leaves swing inward)
             GameObject sl = new GameObject("ShutterL");
@@ -444,8 +499,8 @@ namespace DarkAwakening.EditorTools
             Place("GhostJar", "ghostjar", "GhostJar", parent, new Vector3(2.0f, 0f, -1.4f), Vector3.zero, 1f);
             // walls
             Place("WoodCarving", "woodcarving", "WoodCarving", parent, new Vector3(-2.47f, 1.7f, -0.3f), new Vector3(0f, -90f, 0f), 1f);
-            // worn wooden bench against the south wall (replaces the TV cabinet; no modern technology in the room)
-            Place("Bench", "bench", "WornWoodenBench", parent, new Vector3(0.45f, 0f, -1.68f), Vector3.zero, 0.5f);
+            // worn wooden bench against the kitchen's south wall
+            Place("Bench", "bench", "WornWoodenBench", parent, new Vector3(-1.1f, 0f, -5.015f), Vector3.zero, 0.5f);
         }
 
         static void WallN(Transform p, Material m, float x0, float x1, float y0, float y1)

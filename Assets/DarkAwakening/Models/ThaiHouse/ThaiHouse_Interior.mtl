@@ -4,3 +4,29 @@ newmtl M_Wall_Planks
 Kd 1 1 1
 newmtl M_Dark_Wood
 Kd 1 1 1
+newmtl M_Clay
+Kd 1 1 1
+newmtl M_Jar
+Kd 1 1 1
+newmtl M_Woven
+Kd 1 1 1
+newmtl M_Mat
+Kd 1 1 1
+newmtl M_Cloth
+Kd 1 1 1
+newmtl M_Flower
+Kd 1 1 1
+newmtl M_Brass
+Kd 1 1 1
+newmtl M_Iron
+Kd 1 1 1
+newmtl M_Stone
+Kd 1 1 1
+newmtl M_Ash
+Kd 1 1 1
+newmtl M_Chili
+Kd 1 1 1
+newmtl M_Pale
+Kd 1 1 1
+newmtl M_Photo
+Kd 1 1 1

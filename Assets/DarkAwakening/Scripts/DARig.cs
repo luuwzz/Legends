@@ -38,7 +38,12 @@ namespace DarkAwakening
         public float dwellSeconds = 2.0f;
         public float eyeHeight = 1.15f;
         public bool allowDwell = true;
-        public bool freeTeleport = false;     // click on the floor to walk there (only while the game waits for the player)
+        public Vector4[] walkAreas;           // walkable rectangles (x0, z0, x1, z1) - one per room
+        public Vector4[] blocked;             // furniture footprints the player cannot teleport into (x0, z0, x1, z1)
+        public bool freeTeleport = false;     // the player may move (only while the game waits for the player)
+        public bool smoothMove = false;       // enable joystick / WASD walking (set by the game director)
+        public bool clickTeleport = false;    // old floor-click teleport (off: a missed click used to teleport the player)
+        public float moveSpeed = 1.5f;
         bool teleporting;
         public System.Action OnBlink;
         public float maxRayDistance = 9f;
@@ -115,6 +120,7 @@ namespace DarkAwakening
             ReadHeadAndHands();
             ReadTrigger();
             UpdatePointer();
+            UpdateMove();
             UpdateOverlays();
             UpdateShake();
             if (recenterQueued)
@@ -267,14 +273,25 @@ namespace DarkAwakening
                 ShakeCharge = Mathf.Clamp(ShakeCharge + Mathf.Max(0f, PointerSpeed - 1.3f) * dtp - 0.5f * dtp, 0f, 2f);
             }
 
-            RaycastHit hit;
             DAInteractable found = null;
             Vector3 endPoint = ray.origin + ray.direction * 3f;
-            if (Physics.Raycast(ray, out hit, maxRayDistance, ~0, QueryTriggerInteraction.Collide))
             {
-                endPoint = hit.point;
-                found = hit.collider.GetComponentInParent<DAInteractable>();
-                if (found != null && !found.interactable) found = null;
+                // closest ACTIVE interactable along the ray; invisible trigger zones (windows, vents) must not hide the buttons behind them
+                RaycastHit[] hits = Physics.RaycastAll(ray, maxRayDistance, ~0, QueryTriggerInteraction.Collide);
+                float best = float.MaxValue, bestAny = float.MaxValue;
+                for (int hi = 0; hi < hits.Length; hi++)
+                {
+                    DAInteractable di = hits[hi].collider.GetComponentInParent<DAInteractable>();
+                    if (di != null && di.interactable)
+                    {
+                        if (hits[hi].distance < best) { best = hits[hi].distance; found = di; endPoint = hits[hi].point; }
+                    }
+                    else if (di == null && hits[hi].collider.GetComponentInParent<DARepelZone>() == null && hits[hi].distance < bestAny && found == null)
+                    {
+                        bestAny = hits[hi].distance; endPoint = hits[hi].point;
+                    }
+                }
+                if (found != null) endPoint = ray.origin + ray.direction * best;
             }
 
             if (found != Hovered)
@@ -304,15 +321,14 @@ namespace DarkAwakening
             else
             {
                 DwellProgress = 0f;
-                if (freeTeleport && TriggerDown && !teleporting && Fade < 0.05f)
+                if (clickTeleport && freeTeleport && TriggerDown && !teleporting && Fade < 0.05f)
                 {
                     float dy = ray.direction.y;
                     if (dy < -0.02f)
                     {
                         float tt = (0f - ray.origin.y) / dy;
                         Vector3 gp = ray.origin + ray.direction * tt;
-                        gp.x = Mathf.Clamp(gp.x, -2.1f, 2.0f);
-                        gp.z = Mathf.Clamp(gp.z, -1.95f, 2.0f);
+                        gp = ClampWalk(gp);
                         gp.y = 0f;
                         StartCoroutine(FreeBlink(gp));
                     }
@@ -473,6 +489,83 @@ namespace DarkAwakening
             }
             SnapTo(anchor, eye);
             SetFade(0f);
+        }
+
+
+        // ------------------------------------------------------------------ smooth walking
+        Vector2 ReadMoveInput()
+        {
+            Vector2 v = Vector2.zero;
+            if (XRActive)
+            {
+                Vector2 a;
+                InputDevice l = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
+                if (l.isValid && l.TryGetFeatureValue(CommonUsages.primary2DAxis, out a)) v = a;
+                if (v.sqrMagnitude < 0.04f)
+                {
+                    InputDevice r = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
+                    if (r.isValid && r.TryGetFeatureValue(CommonUsages.primary2DAxis, out a)) v = a;
+                }
+            }
+            if (Keyboard.current != null)
+            {
+                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) v.y += 1f;
+                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) v.y -= 1f;
+                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) v.x += 1f;
+                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) v.x -= 1f;
+            }
+            if (Gamepad.current != null) v += Gamepad.current.leftStick.ReadValue();
+            if (v.sqrMagnitude > 1f) v.Normalize();
+            return v;
+        }
+
+        void UpdateMove()
+        {
+            if (!smoothMove || !freeTeleport || teleporting || Fade > 0.3f) return;
+            Vector2 v = ReadMoveInput();
+            if (v.sqrMagnitude < 0.04f) return;
+            Vector3 f = head.forward; f.y = 0f;
+            if (f.sqrMagnitude < 0.01f) { f = transform.forward; f.y = 0f; }
+            f.Normalize();
+            Vector3 r = Vector3.Cross(Vector3.up, f);
+            Vector3 d = (f * v.y + r * v.x) * moveSpeed * Time.deltaTime;
+            Vector3 hp = head.position;
+            Vector3 c = ClampWalk(new Vector3(hp.x + d.x, 0f, hp.z + d.z));
+            transform.position += new Vector3(c.x - hp.x, 0f, c.z - hp.z);
+        }
+
+        /// <summary>Keeps a floor-click target inside the rooms and out of the furniture.</summary>
+        Vector3 ClampWalk(Vector3 p)
+        {
+            if (walkAreas == null || walkAreas.Length == 0)
+            {
+                p.x = Mathf.Clamp(p.x, -2.1f, 2.0f);
+                p.z = Mathf.Clamp(p.z, -1.95f, 2.0f);
+                return p;
+            }
+            Vector3 best = p; float bd = float.MaxValue; Vector4 ba = walkAreas[0];
+            for (int i = 0; i < walkAreas.Length; i++)
+            {
+                Vector4 a = walkAreas[i];
+                Vector3 q = new Vector3(Mathf.Clamp(p.x, a.x, a.z), 0f, Mathf.Clamp(p.z, a.y, a.w));
+                float d = (q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z);
+                if (d < bd) { bd = d; best = q; ba = a; }
+            }
+            if (blocked != null)
+            {
+                for (int i = 0; i < blocked.Length; i++)
+                {
+                    Vector4 b = blocked[i];
+                    if (best.x > b.x && best.x < b.z && best.z > b.y && best.z < b.w)
+                    {
+                        float dl = best.x - b.x, dr = b.z - best.x, db = best.z - b.y, dt = b.w - best.z;
+                        float m = Mathf.Min(Mathf.Min(dl, dr), Mathf.Min(db, dt));
+                        if (m == dl) best.x = b.x - 0.02f; else if (m == dr) best.x = b.z + 0.02f; else if (m == db) best.z = b.y - 0.02f; else best.z = b.w + 0.02f;
+                        best.x = Mathf.Clamp(best.x, ba.x, ba.z); best.z = Mathf.Clamp(best.z, ba.y, ba.w);
+                    }
+                }
+            }
+            return best;
         }
 
         IEnumerator FreeBlink(Vector3 ground)

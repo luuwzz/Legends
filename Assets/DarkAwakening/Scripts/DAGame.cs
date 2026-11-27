@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -43,6 +44,10 @@ namespace DarkAwakening
         public DAInteractable lighterPick;
         public DAInteractable branchPick;
         public DAInteractable hidePick;
+        public DAInteractable hideWestPick;
+        public DAInteractable hideKitPick;
+        public Transform aAltar, aKitchenBranch, aHideWest, aHideKit;
+        public DARepelZone westZone, kitchenZone;
 
         [Header("Lights")]
         public Light moon;
@@ -235,7 +240,7 @@ namespace DarkAwakening
 
         void SetInteractables(bool on)
         {
-            DAInteractable[] all = { windowMark, shutterPick, lighterPick, branchPick, hidePick };
+            DAInteractable[] all = { windowMark, shutterPick, lighterPick, branchPick, hidePick, hideWestPick, hideKitPick };
             for (int i = 0; i < all.Length; i++) if (all[i] != null) all[i].SetInteractable(on);
         }
 
@@ -408,6 +413,7 @@ namespace DarkAwakening
             ApplyMood(moodBlack);
             ShutterAngle = 6f;                               // ajar
             if (candleFlicker != null) { candleFlicker.on = true; }
+            rig.smoothMove = false;
             rig.SnapTo(aBed, 0.85f);                         // lying in bed
             StartCoroutine(MoodTo(moodNight, 6f));
             sfx.Bed2D("wind", sfx.wind, 0.40f, 6f);
@@ -521,12 +527,74 @@ namespace DarkAwakening
             return q;
         }
 
+        // -------------------------------------------------------------- hiding places (one per room)
+        class HidePlace
+        {
+            public DAInteractable pick; public Transform anchor;
+            public Vector3[] spots; public Vector3[] faces; public bool main;
+            public Action<DAInteractable> handler;
+        }
+        List<HidePlace> hidePlaces;
+        HidePlace chosenHide;
+
+        void BuildHidePlaces()
+        {
+            if (hidePlaces != null) return;
+            hidePlaces = new List<HidePlace>();
+            if (hidePick != null)
+            {
+                HidePlace bed = new HidePlace();
+                bed.pick = hidePick; bed.anchor = aHide; bed.main = true;
+                bed.spots = new Vector3[] { doorZone.peekPoint.position, wallZone.peekPoint.position, krasueWindow.position };
+                bed.faces = new Vector3[] { doorZone.facing, wallZone.facing, Vector3.back };
+                hidePlaces.Add(bed);
+            }
+            if (hideWestPick != null && westZone != null && aHideWest != null)
+            {
+                HidePlace w = new HidePlace();
+                w.pick = hideWestPick; w.anchor = aHideWest;
+                Vector3 p = westZone.peekPoint.position;
+                w.spots = new Vector3[] { p, p + new Vector3(0f, 0f, 0.42f), p + new Vector3(0f, 0f, -0.42f) };
+                w.faces = new Vector3[] { westZone.facing, westZone.facing, westZone.facing };
+                hidePlaces.Add(w);
+            }
+            if (hideKitPick != null && kitchenZone != null && aHideKit != null)
+            {
+                HidePlace k = new HidePlace();
+                k.pick = hideKitPick; k.anchor = aHideKit;
+                Vector3 p = kitchenZone.peekPoint.position;
+                k.spots = new Vector3[] { p, p + new Vector3(0.42f, 0f, 0f), p + new Vector3(-0.42f, 0f, 0f) };
+                k.faces = new Vector3[] { kitchenZone.facing, kitchenZone.facing, kitchenZone.facing };
+                hidePlaces.Add(k);
+            }
+        }
+
+        // the player picks one of the glowing hiding places (any room); result in chosenHide
+        IEnumerator ChooseHide(float timeout)
+        {
+            BuildHidePlaces();
+            chosenHide = null;
+            foreach (HidePlace hp in hidePlaces)
+            {
+                HidePlace cap = hp;
+                hp.handler = delegate (DAInteractable x) { if (chosenHide == null) chosenHide = cap; };
+                hp.pick.Activated += hp.handler;
+                hp.pick.SetInteractable(true);
+            }
+            rig.freeTeleport = true;
+            float t = 0f;
+            while (chosenHide == null && t < timeout) { t += Time.deltaTime; yield return null; }
+            rig.freeTeleport = false;
+            foreach (HidePlace hp in hidePlaces) { hp.pick.Activated -= hp.handler; hp.pick.SetInteractable(false); }
+            if (chosenHide == null) chosenHide = hidePlaces[0];
+        }
+
         // -------------------------------------------------------------- PHASE 2
         // storyboard 4-9: candles -> scare her off at the window (not enough) -> hide -> special plant -> she flees at dawn
         IEnumerator Phase2()
         {
             StartCoroutine(MoodTo(moodDark, 3f));
-            rig.SnapTo(aBed, rig.eyeHeight - 0.1f);
+            rig.smoothMove = true;                            // free walking (left stick / WASD) from here on; no teleport back to the bed
             sfx.Bed2D("wind", sfx.wind, 0.22f, 3f);
             sfx.Music(sfx.musicTension, 0.8f, 5f);
             fearTarget = 0.4f;
@@ -534,83 +602,83 @@ namespace DarkAwakening
             yield return Wait(1.2f);
             yield return rig.FadeTo(0f, 2.0f);
 
-            // panel 3: hide and watch the room
+            // panel 3: hide and watch the room (behind the bed, behind the rice bin, or in the kitchen nook)
             yield return Line("", "<i>(muffled thudding against the walls)</i>");
             yield return Line("", "She is still out there... I have to hide!");
-            hidePick.SetInteractable(true);
-            ui.Hint("Go to the dark corner behind the bed (pull the trigger on the glowing spot)");
-            yield return WaitFor(hidePick, 45f);
-            hidePick.SetInteractable(false);
+            ui.Hint("Hide! Pull the trigger on a glowing spot: behind the bed, behind the rice bin (west room) or in the kitchen corner");
+            yield return ChooseHide(60f);
+            HidePlace hp1 = chosenHide;
             ui.ClearHint();
-            yield return rig.BlinkTo(aHide, 0.80f);
-            yield return HideSequence(13f, false);
+            yield return rig.BlinkTo(hp1.anchor, 0.80f);
+            yield return HideSequence(13f, false, hp1);
+            yield return rig.RaiseEye(rig.transform.position.y, aBed.position.y + rig.eyeHeight, 1.2f);   // stand back up, no teleport
 
-            // panel 4: spot the candles and walk toward them
+            // panel 4: spot the candles in the family altar room and walk there
             yield return Line("", "<i>(silence)</i>");
-            yield return Line("", "Is she gone? ... Wait. Something is glowing on the table.");
+            yield return Line("", "Is she gone? ... Wait. Something is glowing in the altar room.");
             yield return Line("", "Candles. Fire keeps spirits away, " + Friend + " always said.");
             lighterPick.SetInteractable(true);
-            ui.Hint("Aim at the glowing candle and pull the trigger (or click on the floor to walk there)");
-            yield return WaitFor(lighterPick, 70f);
+            ui.Hint("Walk to the altar room (west doorway) with the LEFT STICK (WASD), then aim at the glowing candle and pull the trigger");
+            yield return WaitFor(lighterPick, 90f);
             lighterPick.SetInteractable(false);
             ui.ClearHint();
             // panel 5: pick up the candle
             yield return PickLighter();
 
-            // panel 6: she is back, right at the window - recognise her, try to scare her off with the candle
+            // panel 6: she is back, at the altar-room window - recognise her, try to scare her off with the candle
             yield return Wait(1.2f);
             fearTarget = 0.6f;
-            sfx.Play3D(sfx.scratch, krasueWindow.position, 1f);
+            Vector3 wPeek = westZone.peekPoint.position;
+            sfx.Play3D(sfx.scratch, wPeek, 1f);
             rig.Shake(0.015f, 0.5f);
             yield return Wait(0.8f);
-            sfx.Play3D(sfx.windowOpen != null ? sfx.windowOpen : sfx.slam, krasueWindow.position, 1f);
-            StartCoroutine(SetShutters(95f, 0.7f, false));
-            yield return Wait(0.5f);
             yield return Line("", "<i>(something is at the window)</i>");
-            // no forced teleport: the player stays where he picked the object up
             krasue.Show(true);
             krasue.SetGlow(1.3f);
-            krasue.PlaceHead(windowZone.peekPoint.position, windowZone.facing);
-            sfx.Play3D(sfx.scream, windowZone.peekPoint.position, 1f, 1f, 30f);
+            krasue.PlaceHead(wPeek, westZone.facing);
+            sfx.Play3D(sfx.scream, wPeek, 1f, 1f, 30f);
             rig.Shake(0.05f, 0.7f);
             fearTarget = 0.85f;
             yield return Line("", "My friend " + Girl + "... Stay back! I have the candle!");
-            yield return Repel(windowZone, "Aim at her head and HOLD the trigger to hold the candle against her", HoldMode.Fire, true);
+            yield return Repel(westZone, "Aim at her head and HOLD the trigger to hold the candle against her", HoldMode.Fire, true);
 
-            // panel 7: not enough - hide again, then spot the special plant
-            StartCoroutine(SetShutters(0f, 0.2f, true));
+            // panel 7: not enough - hide again (any room), then spot the special plant in the kitchen
             yield return Line("", "It is not enough! The flame will not hold her!");
             heldVisible = false;
-            hidePick.SetInteractable(true);
-            ui.Hint("Hide again behind the bed (pull the trigger on the glowing spot)");
-            yield return WaitFor(hidePick, 45f);
-            hidePick.SetInteractable(false);
+            ui.Hint("Hide again! Pull the trigger on a glowing spot (behind the bed, behind the rice bin or in the kitchen corner)");
+            yield return ChooseHide(60f);
+            HidePlace hp2 = chosenHide;
             ui.ClearHint();
-            yield return rig.BlinkTo(aHide, 0.80f);
-            yield return HideSequence(9f, false);
+            yield return rig.BlinkTo(hp2.anchor, 0.80f);
+            yield return HideSequence(9f, false, hp2);
+            yield return rig.RaiseEye(rig.transform.position.y, aBed.position.y + rig.eyeHeight, 1.2f);   // stand back up, no teleport
 
-            yield return Line("", "Wait... that plant by the door. The jujube thorns!");
+            yield return Line("", "Wait... the plant hanging by the hearth. The jujube thorns!");
             yield return Line("", "Grandmother said spirits fear their thorns.");
             branchPick.SetInteractable(true);
-            ui.Hint("Aim at the glowing plant by the door and pull the trigger");
-            yield return WaitFor(branchPick, 70f);
+            ui.Hint("Walk to the kitchen (south doorway) with the LEFT STICK (WASD), then aim at the thorn branch by the hearth and pull the trigger");
+            yield return WaitFor(branchPick, 90f);
             branchPick.SetInteractable(false);
             ui.ClearHint();
             yield return PickBranch();
 
-            // panel 8: grab it and make her run away
+            // panel 8: grab it and make her run away - she now comes to the kitchen window
             yield return Wait(1.0f);
             fearTarget = 0.7f;
-            sfx.Play3D(sfx.scratch, krasueWindow.position, 1f);
+            Vector3 kPeek = kitchenZone.peekPoint.position;
+            sfx.Play3D(sfx.scratch, kPeek, 1f);
             rig.Shake(0.02f, 0.6f);
-            yield return Line("", "<i>(claws scraping at the window)</i>");
-            sfx.Play3D(sfx.windowOpen != null ? sfx.windowOpen : sfx.slam, krasueWindow.position, 1f);
-            StartCoroutine(SetShutters(95f, 0.6f, false));
+            yield return Line("", "<i>(claws scraping at the kitchen window)</i>");
             yield return Wait(0.6f);
+            krasue.Show(true);
+            krasue.SetGlow(1.3f);
+            krasue.PlaceHead(kPeek, kitchenZone.facing);
+            sfx.Play3D(sfx.scream, kPeek, 1f, 1f, 30f);
+            rig.Shake(0.05f, 0.7f);
             heldVisible = true;
             holdMode = HoldMode.Thorns;
             yield return Line("", "She is back! The thorns... hold them up!");
-            yield return Repel(windowZone, "Aim at her head and HOLD the trigger to push the thorn plant at her", HoldMode.Thorns, false);
+            yield return Repel(kitchenZone, "Aim at her head and HOLD the trigger to push the thorn plant at her", HoldMode.Thorns, false);
 
             // panel 9: she is gone
             heldVisible = false;
@@ -628,9 +696,9 @@ namespace DarkAwakening
 
         void UpdatePickHint()
         {
-            if (!gotLighter && !gotBranch) ui.Hint("Find the LIGHTER on the table and the JUJUBE THORN BRANCH by the door");
-            else if (!gotLighter) ui.Hint("Now find the lighter on the table");
-            else if (!gotBranch) ui.Hint("Now take the jujube thorn branch by the door");
+            if (!gotLighter && !gotBranch) ui.Hint("Find the CANDLE in the altar room and the JUJUBE THORN BRANCH in the kitchen");
+            else if (!gotLighter) ui.Hint("Now find the candle in the altar room");
+            else if (!gotBranch) ui.Hint("Now take the jujube thorn branch in the kitchen");
         }
 
         IEnumerator PickLighter()
@@ -638,7 +706,6 @@ namespace DarkAwakening
             pickBusy = true;
             lighterPick.SetInteractable(false);
             ui.ClearHint();
-            yield return rig.BlinkTo(aTable, rig.eyeHeight);
             lighterPick.Consume();
             sfx.Play2D(sfx.pickup, 0.9f);
             gotLighter = true; hasLighter = true; heldVisible = true;
@@ -652,7 +719,6 @@ namespace DarkAwakening
             pickBusy = true;
             branchPick.SetInteractable(false);
             ui.ClearHint();
-            yield return rig.BlinkTo(aDoor, rig.eyeHeight);
             branchPick.Consume();
             sfx.Play2D(sfx.pickup, 0.9f);
             gotBranch = true; hasBranch = true;
@@ -784,12 +850,15 @@ namespace DarkAwakening
         }
 
         // -------------------------------------------------------------- Hide
-        IEnumerator HideSequence(float hideTime, bool final)
+        IEnumerator HideSequence(float hideTime, bool final, HidePlace place = null)
         {
+            BuildHidePlaces();
+            bool mainRoom = place == null || place.main;
             fearTarget = 0.7f;
             ui.Hint("Stay still. Do not look at the door or the windows.");
             Vector3[] spots = { doorZone.peekPoint.position, wallZone.peekPoint.position, krasueWindow.position };
             Vector3[] faces = { doorZone.facing, wallZone.facing, Vector3.back };
+            if (place != null && place.spots != null) { spots = place.spots; faces = place.faces; }
             float timer = 0f, looked = 0f, nextMove = 0f;
             int notices = 0, idx = 0;
             krasue.Show(true);
@@ -803,10 +872,10 @@ namespace DarkAwakening
                 {
                     idx = (idx + 1) % spots.Length;
                     krasue.PlaceHead(spots[idx], faces[idx]);
-                    AudioClip c = idx == 0 ? sfx.doorBang : (idx == 1 ? sfx.scratch : sfx.thump);
+                    AudioClip c = mainRoom ? (idx == 0 ? sfx.doorBang : (idx == 1 ? sfx.scratch : sfx.thump)) : (idx == 0 ? sfx.scratch : (idx == 1 ? sfx.thump : sfx.creak));
                     sfx.Play3D(c, spots[idx], 0.9f);
-                    if (idx == 0) StartCoroutine(ShakeDoor(1.2f, 1.6f));
-                    if (idx == 2) StartCoroutine(ShakeShutters(1.2f, 2f));
+                    if (mainRoom && idx == 0) StartCoroutine(ShakeDoor(1.2f, 1.6f));
+                    if (mainRoom && idx == 2) StartCoroutine(ShakeShutters(1.2f, 2f));
                     nextMove = 3.6f;
                 }
                 Vector3 to = (krasue.HeadPosition - rig.HeadPos).normalized;
@@ -845,6 +914,7 @@ namespace DarkAwakening
         // -------------------------------------------------------------- ENDING (dawn + choice)
         IEnumerator Ending()
         {
+            rig.smoothMove = false;
             yield return rig.FadeTo(1f, 1.4f);
             rig.SnapTo(aWindow, rig.eyeHeight);
             ShutterAngle = 0f;
